@@ -97,7 +97,7 @@ fn lines(repo: &Repository) -> Result<(usize, usize), git2::Error> {
     //     true
     // })?;
 
-    Ok((diff.stats()?.files_changed(), diff.stats()?.deletions()))
+    Ok((diff.stats()?.insertions(), diff.stats()?.deletions()))
 }
 
 fn main() {
@@ -123,12 +123,12 @@ fn main() {
     }
 
     // commit info
-    let (files_changed, lines_deleted) = lines(&repo).unwrap();
+    let (lines_inserted, lines_deleted) = lines(&repo).unwrap();
     println!(
         "\n{} files staged, {} added, {} lines deleted",
         files.len().to_string().cyan(),
-        ("+".to_owned() + "0").green(),
-        ("-0".to_owned() + &lines_deleted.to_string()).red(),
+        ("+".to_owned() + &lines_inserted.to_string()).green(),
+        ("-".to_owned() + &lines_deleted.to_string()).red(),
     );
 
     // commit message
