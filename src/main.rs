@@ -1,5 +1,5 @@
 use colored::*;
-use git2::{Config, Cred, Direction, ErrorCode, PushOptions, Repository, Signature, StatusOptions};
+use git2::{Config, ErrorCode, Repository, Signature, StatusOptions};
 use std::io::{self, stdout, Write};
 use std::path::Path;
 use std::process::Command;
@@ -78,65 +78,77 @@ fn commit(repo: &Repository, message: &str) -> Result<(), git2::Error> {
     Ok(())
 }
 
-fn push(repo: &Repository) -> Result<(), git2::Error> {
+fn lines(repo: &Repository) -> Result<(usize, usize), git2::Error> {
+    let mut index = repo.index()?;
+    let oid = index.write_tree()?;
+    let tree = repo.find_tree(oid)?;
+
+    let head_commit = repo.head()?.peel_to_commit()?;
+    let head_tree = head_commit.tree()?;
+
+    let diff = repo.diff_tree_to_tree(Some(&head_tree), Some(&tree), None)?;
+    // let mut line_changes = (0, 0); // (additions, deletions)
+    // diff.print(git2::DiffFormat::Patch, |_, _, line| {
+    //     match line.origin() {
+    //         '+' => line_changes.0 += 1,
+    //         '-' => line_changes.1 += 1,
+    //         _ => (),
+    //     }
+    //     true
+    // })?;
+
+    Ok((diff.stats()?.files_changed(), diff.stats()?.deletions()))
+}
+
+fn main() {
+    let repo = Repository::open(".").expect("Failed to open repository");
+
+    // stage changes
+    let files = stage(&repo).unwrap();
+    for (path, status) in &files {
+        let print_path = path;
+        match status {
+            &git2::Status::INDEX_NEW => {
+                print!("{}", ("+ ".to_owned() + &print_path).green())
+            }
+            &git2::Status::INDEX_MODIFIED => {
+                print!("{}", ("M ".to_owned() + &print_path).yellow())
+            }
+            &git2::Status::INDEX_DELETED => {
+                print!("{}", ("- ".to_owned() + &print_path).red())
+            }
+            _ => continue,
+        }
+        println!();
+    }
+
+    // commit info
+    let (files_changed, lines_deleted) = lines(&repo).unwrap();
+    println!(
+        "\n{} files staged, {} added, {} lines deleted",
+        files.len().to_string().cyan(),
+        ("+".to_owned() + "0").green(),
+        ("-0".to_owned() + &lines_deleted.to_string()).red(),
+    );
+
+    // commit message
+    print!("{}", ": ".magenta());
+    stdout().flush().unwrap();
+    let mut commit_title = String::new();
+    io::stdin()
+        .read_line(&mut commit_title)
+        .expect("Failed to read input");
+    let commit_title = commit_title.trim();
+
+    // commit
+    commit(&repo, commit_title).unwrap();
+
+    // push
     Command::new("git")
         .arg("push")
         .output()
         .expect("failed to execute process");
 
-    Ok(())
-}
-fn main() {
-    let repo = Repository::open(".").expect("Failed to open repository");
-
-    match stage(&repo) {
-        Ok(files) => {
-            for (path, status) in &files {
-                let print_path = path;
-                match status {
-                    &git2::Status::INDEX_NEW => {
-                        print!("{}", ("+ ".to_owned() + &print_path).green())
-                    }
-                    &git2::Status::INDEX_MODIFIED => {
-                        print!("{}", ("M ".to_owned() + &print_path).yellow())
-                    }
-                    &git2::Status::INDEX_DELETED => {
-                        print!("{}", ("- ".to_owned() + &print_path).red())
-                    }
-                    _ => continue,
-                }
-                println!();
-            }
-
-            // commit info
-            println!(
-                "\n{} files staged, {} added, {} lines deleted",
-                files.len().to_string().cyan(),
-                "+0".green(),
-                "-0".red(),
-            );
-
-            // commit message
-            print!("{}", ": ".magenta());
-            stdout().flush().unwrap();
-            let mut commit_title = String::new();
-            io::stdin()
-                .read_line(&mut commit_title)
-                .expect("Failed to read input");
-            let commit_title = commit_title.trim();
-
-            // commit
-            match commit(&repo, commit_title) {
-                // push
-                Ok(()) => match push(&repo) {
-                    Ok(()) => {
-                        println!("{}", "Success!".green());
-                    }
-                    Err(e) => eprintln!("Error: {}", e),
-                },
-                Err(e) => eprintln!("Error: {}", e),
-            }
-        }
-        Err(e) => eprintln!("Error: {}", e),
-    }
+    // success
+    println!("{}", "Success!".green());
 }
