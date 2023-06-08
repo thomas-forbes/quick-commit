@@ -1,5 +1,5 @@
 use colored::*;
-use git2::{Config, ErrorCode, Repository, Signature, StatusOptions};
+use git2::{Config, Cred, ErrorCode, PushOptions, Repository, Signature, StatusOptions};
 use std::io::{self, stdout, Write};
 use std::path::Path;
 
@@ -77,6 +77,30 @@ fn commit(repo: &Repository, message: &str) -> Result<(), git2::Error> {
     Ok(())
 }
 
+fn push(repo: &Repository) -> Result<(), git2::Error> {
+    let mut remote = repo.find_remote("origin")?; // Adjust the remote name if necessary
+
+    let mut push_opts = PushOptions::new();
+
+    let config = Config::open_default()?;
+    let mut callbacks = git2::RemoteCallbacks::new();
+
+    let username = config.get_string("user.name")?;
+    let email = config.get_string("user.email")?;
+
+    callbacks.credentials(move |_url, username_from_url, _allowed_types| {
+        Cred::userpass_plaintext(&username, &email) // you may want to adjust this depending on the desired authentication method
+    });
+
+    push_opts.remote_callbacks(callbacks);
+
+    remote.push(
+        &["refs/heads/master:refs/heads/master"],
+        Some(&mut push_opts),
+    )?;
+
+    Ok(())
+}
 fn main() {
     let repo = Repository::open(".").expect("Failed to open repository");
 
@@ -98,12 +122,16 @@ fn main() {
                 }
                 println!();
             }
+
+            // commit info
             println!(
                 "\n{} files staged, {} added, {} lines deleted",
                 files.len().to_string().cyan(),
                 "+0".green(),
                 "-0".red(),
             );
+
+            // commit message
             print!("{}", ": ".magenta());
             stdout().flush().unwrap();
             let mut commit_title = String::new();
@@ -111,8 +139,16 @@ fn main() {
                 .read_line(&mut commit_title)
                 .expect("Failed to read input");
             let commit_title = commit_title.trim();
+
+            // commit
             match commit(&repo, commit_title) {
-                Ok(()) => println!("Commit created: {}", commit_title),
+                // push
+                Ok(()) => match push(&repo) {
+                    Ok(()) => {
+                        println!("{}", "Success!".green());
+                    }
+                    Err(e) => eprintln!("Error: {}", e),
+                },
                 Err(e) => eprintln!("Error: {}", e),
             }
         }
