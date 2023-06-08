@@ -87,15 +87,6 @@ fn lines(repo: &Repository) -> Result<(usize, usize), git2::Error> {
     let head_tree = head_commit.tree()?;
 
     let diff = repo.diff_tree_to_tree(Some(&head_tree), Some(&tree), None)?;
-    // let mut line_changes = (0, 0); // (additions, deletions)
-    // diff.print(git2::DiffFormat::Patch, |_, _, line| {
-    //     match line.origin() {
-    //         '+' => line_changes.0 += 1,
-    //         '-' => line_changes.1 += 1,
-    //         _ => (),
-    //     }
-    //     true
-    // })?;
 
     Ok((diff.stats()?.insertions(), diff.stats()?.deletions()))
 }
