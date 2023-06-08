@@ -1,7 +1,8 @@
 use colored::*;
-use git2::{Config, Cred, ErrorCode, PushOptions, Repository, Signature, StatusOptions};
+use git2::{Config, Cred, Direction, ErrorCode, PushOptions, Repository, Signature, StatusOptions};
 use std::io::{self, stdout, Write};
 use std::path::Path;
+use std::process::Command;
 
 fn stage(repo: &Repository) -> Result<Vec<(String, git2::Status)>, git2::Error> {
     let mut index = repo.index()?;
@@ -78,26 +79,10 @@ fn commit(repo: &Repository, message: &str) -> Result<(), git2::Error> {
 }
 
 fn push(repo: &Repository) -> Result<(), git2::Error> {
-    let mut remote = repo.find_remote("origin")?; // Adjust the remote name if necessary
-
-    let mut push_opts = PushOptions::new();
-
-    let config = Config::open_default()?;
-    let mut callbacks = git2::RemoteCallbacks::new();
-
-    let username = config.get_string("user.name")?;
-    let email = config.get_string("user.email")?;
-
-    callbacks.credentials(move |_url, username_from_url, _allowed_types| {
-        Cred::userpass_plaintext(&username, &email) // you may want to adjust this depending on the desired authentication method
-    });
-
-    push_opts.remote_callbacks(callbacks);
-
-    remote.push(
-        &["refs/heads/master:refs/heads/master"],
-        Some(&mut push_opts),
-    )?;
+    Command::new("git")
+        .arg("push")
+        .output()
+        .expect("failed to execute process");
 
     Ok(())
 }
