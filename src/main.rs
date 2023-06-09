@@ -164,8 +164,8 @@ fn main() {
     // push
     let mut child = Command::new("git")
         .arg("push")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        // .stdout(Stdio::piped())
+        // .stderr(Stdio::piped())
         .spawn()
         .unwrap_or_else(|_| {
             eprintln!("{}", "Unable to call 'git push' •◠•".red());

@@ -16,6 +16,7 @@ exclude = ["assets/*"]
 [dependencies]
 git2 = "0.13.22"
 colored = "2.0"
+libc = "0.2"
 
 [[bin]]
 name = "qc"
