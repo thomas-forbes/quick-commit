@@ -112,6 +112,10 @@ fn main() {
         eprintln!("{}", "Error staging files •◠•".red());
         std::process::exit(1);
     });
+    if files.len() == 0 {
+        println!("{}", "No changes to commit •◡•".yellow());
+        std::process::exit(0);
+    }
     for (path, status) in &files {
         let print_path = path;
         match status {
