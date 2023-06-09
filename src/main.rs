@@ -92,7 +92,20 @@ fn lines(repo: &Repository) -> Result<(usize, usize), git2::Error> {
 }
 
 fn main() {
-    let repo = Repository::open(".").expect("Failed to open repository");
+    let repo = Repository::discover(".").unwrap_or_else(|_| {
+        eprintln!("{}", "Error opening git repo •◠•".red());
+        std::process::exit(1);
+    });
+    println!(
+        "{}",
+        repo.path()
+            .parent()
+            .and_then(|path| path.file_name())
+            .and_then(|name| name.to_str())
+            .unwrap_or("no name")
+            .italic()
+            .cyan()
+    );
 
     // stage changes
     let files = stage(&repo).unwrap_or_else(|_| {

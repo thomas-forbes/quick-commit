@@ -3,14 +3,19 @@ name = "quick-commit"
 description = "Commit all changes in 4 key presses"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/thomas-forbes/quick-commit"
+license = "MIT"
+readme = "README.md"
+keywords = ["cli", "git"]
+authors = ["Thomas Forbes <34174315+thomas-forbes@users.noreply.github.com>"]
+categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-git2="0.13.22"
-colored="2.0"
-
+git2 = "0.13.22"
+colored = "2.0"
 
 [[bin]]
-name="qc"
-path="src/main.rs"
+name = "qc"
+path = "src/main.rs"
