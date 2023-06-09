@@ -95,7 +95,10 @@ fn main() {
     let repo = Repository::open(".").expect("Failed to open repository");
 
     // stage changes
-    let files = stage(&repo).unwrap();
+    let files = stage(&repo).unwrap_or_else(|_| {
+        eprintln!("{}", "Error staging files •◠•".red());
+        std::process::exit(1);
+    });
     for (path, status) in &files {
         let print_path = path;
         match status {
@@ -114,9 +117,12 @@ fn main() {
     }
 
     // commit info
-    let (lines_inserted, lines_deleted) = lines(&repo).unwrap();
+    let (lines_inserted, lines_deleted) = lines(&repo).unwrap_or_else(|_| {
+        eprintln!("{}", "Error reading git info •◠•".red());
+        std::process::exit(1);
+    });
     println!(
-        "\n{} files staged, {} added, {} lines deleted",
+        "\n{} files staged, {} lines added, {} lines deleted",
         files.len().to_string().cyan(),
         ("+".to_owned() + &lines_inserted.to_string()).green(),
         ("-".to_owned() + &lines_deleted.to_string()).red(),
@@ -132,7 +138,10 @@ fn main() {
     let commit_title = commit_title.trim();
 
     // commit
-    commit(&repo, commit_title).unwrap();
+    commit(&repo, commit_title).unwrap_or_else(|_| {
+        eprintln!("{}", "Error committing changes •◠•".red());
+        std::process::exit(1);
+    });
 
     // push
     if !Command::new("git")
@@ -140,10 +149,13 @@ fn main() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .status()
-        .unwrap()
+        .unwrap_or_else(|_| {
+            eprintln!("{}", "Unable to call 'git push' •◠•".red());
+            std::process::exit(1);
+        })
         .success()
     {
-        println!("{}", "Error pushing code •◠•".red());
+        eprintln!("{}", "Error pushing code •◠•".red());
     } else {
         println!("{}", "Success •◡•".green());
     }

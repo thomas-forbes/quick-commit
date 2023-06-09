@@ -1,5 +1,6 @@
 [package]
 name = "quick-commit"
+description = "Commit all changes in 4 key presses"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,5 +9,8 @@ edition = "2021"
 [dependencies]
 git2="0.13.22"
 colored="2.0"
-# termcolor = "1.2"
 
+
+[[bin]]
+name="qc"
+path="src/main.rs"
