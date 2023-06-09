@@ -3,6 +3,7 @@ use git2::{Config, ErrorCode, Repository, Signature, StatusOptions};
 use std::io::{self, stdout, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::{mem, thread};
 
 fn stage(repo: &Repository) -> Result<Vec<(String, git2::Status)>, git2::Error> {
     let mut index = repo.index()?;
@@ -161,19 +162,24 @@ fn main() {
     });
 
     // push
-    if !Command::new("git")
+    let mut child = Command::new("git")
         .arg("push")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .status()
+        .spawn()
         .unwrap_or_else(|_| {
             eprintln!("{}", "Unable to call 'git push' •◠•".red());
             std::process::exit(1);
-        })
-        .success()
-    {
-        eprintln!("{}", "Error pushing code •◠•".red());
-    } else {
-        println!("{}", "Success •◡•".green());
-    }
+        });
+
+    let handle = thread::spawn(move || {
+        let success = child.wait().expect("Failed to wait on child process");
+        if !success.success() {
+            eprintln!("{}", "Error pushing code •◠•".red());
+        } else {
+            println!("{}", "Success •◡•".green());
+        }
+    });
+
+    mem::forget(handle);
 }
