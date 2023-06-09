@@ -2,7 +2,7 @@ use colored::*;
 use git2::{Config, ErrorCode, Repository, Signature, StatusOptions};
 use std::io::{self, stdout, Write};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 fn stage(repo: &Repository) -> Result<Vec<(String, git2::Status)>, git2::Error> {
     let mut index = repo.index()?;
@@ -135,11 +135,16 @@ fn main() {
     commit(&repo, commit_title).unwrap();
 
     // push
-    Command::new("git")
+    if !Command::new("git")
         .arg("push")
-        .output()
-        .expect("failed to execute process");
-
-    // success
-    println!("{}", "Success!".green());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .status()
+        .unwrap()
+        .success()
+    {
+        println!("{}", "Error pushing code •◠•".red());
+    } else {
+        println!("{}", "Success •◡•".green());
+    }
 }
