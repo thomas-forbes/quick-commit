@@ -1,9 +1,9 @@
 use colored::*;
 use git2::{Config, ErrorCode, Repository, Signature, StatusOptions};
+use std::env;
 use std::io::{self, stdout, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::{env, mem, thread};
 
 fn stage(repo: &Repository) -> Result<Vec<(String, git2::Status)>, git2::Error> {
     let mut index = repo.index()?;
@@ -109,7 +109,7 @@ fn run_background_process() {
     if !success.success() {
         eprintln!("\n{}", "Error pushing code •◠•".red());
     } else {
-        println!("\n{}", "pushed code 🚀".green());
+        print!("\n{}", "pushed code 🚀 ".green());
     }
 }
 fn main() {
