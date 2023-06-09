@@ -3,7 +3,7 @@ use git2::{Config, ErrorCode, Repository, Signature, StatusOptions};
 use std::io::{self, stdout, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::{mem, thread};
+use std::{env, mem, thread};
 
 fn stage(repo: &Repository) -> Result<Vec<(String, git2::Status)>, git2::Error> {
     let mut index = repo.index()?;
@@ -92,7 +92,34 @@ fn lines(repo: &Repository) -> Result<(usize, usize), git2::Error> {
     Ok((diff.stats()?.insertions(), diff.stats()?.deletions()))
 }
 
+fn run_background_process() {
+    // push
+    let mut child = Command::new("git")
+        .arg("push")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|_| {
+            eprintln!("{}", "Unable to call 'git push' •◠•".red());
+            std::process::exit(1);
+        });
+
+    let success = child.wait().expect("Failed to wait on child process");
+
+    if !success.success() {
+        eprintln!("{}", "Error pushing code •◠•".red());
+    } else {
+        println!("{}", "Success •◡•".green());
+    }
+}
 fn main() {
+    if env::var("RUN_BACKGROUND_TASK").is_ok() {
+        run_background_process();
+        std::process::exit(0);
+    }
+
+    //     // Your larger program continues...
+    // }
     let repo = Repository::discover(".").unwrap_or_else(|_| {
         eprintln!("{}", "Error opening git repo •◠•".red());
         std::process::exit(1);
@@ -161,25 +188,32 @@ fn main() {
         std::process::exit(1);
     });
 
-    // push
-    let mut child = Command::new("git")
-        .arg("push")
-        // .stdout(Stdio::piped())
-        // .stderr(Stdio::piped())
+    let current_exe = env::current_exe().expect("Failed to get current executable");
+
+    // Set the environment variable "RUN_BACKGROUND_TASK" to any value (e.g. "1").
+    let child = Command::new(current_exe)
+        .env("RUN_BACKGROUND_TASK", "1")
         .spawn()
-        .unwrap_or_else(|_| {
-            eprintln!("{}", "Unable to call 'git push' •◠•".red());
-            std::process::exit(1);
-        });
+        .expect("Failed to start background process");
+    // push
+    // let mut child = Command::new("git")
+    //     .arg("push")
+    //     // .stdout(Stdio::piped())
+    //     // .stderr(Stdio::piped())
+    //     .spawn()
+    //     .unwrap_or_else(|_| {
+    //         eprintln!("{}", "Unable to call 'git push' •◠•".red());
+    //         std::process::exit(1);
+    //     });
 
-    let handle = thread::spawn(move || {
-        let success = child.wait().expect("Failed to wait on child process");
-        if !success.success() {
-            eprintln!("{}", "Error pushing code •◠•".red());
-        } else {
-            println!("{}", "Success •◡•".green());
-        }
-    });
+    // let handle = thread::spawn(move || {
+    //     let success = child.wait().expect("Failed to wait on child process");
+    //     if !success.success() {
+    //         eprintln!("{}", "Error pushing code •◠•".red());
+    //     } else {
+    //         println!("{}", "Success •◡•".green());
+    //     }
+    // });
 
-    mem::forget(handle);
+    // mem::forget(handle);
 }
