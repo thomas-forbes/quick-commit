@@ -9,6 +9,7 @@ readme = "README.md"
 keywords = ["cli", "git"]
 authors = ["Thomas Forbes <34174315+thomas-forbes@users.noreply.github.com>"]
 categories = ["command-line-utilities"]
+exclude = ["assets/*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
