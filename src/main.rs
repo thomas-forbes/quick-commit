@@ -107,9 +107,9 @@ fn run_background_process() {
     let success = child.wait().expect("Failed to wait on child process");
 
     if !success.success() {
-        eprintln!("{}", "Error pushing code •◠•".red());
+        eprintln!("\n{}", "Error pushing code •◠•".red());
     } else {
-        println!("{}", "Success •◡•".green());
+        println!("\n{}", "pushed code 🚀".green());
     }
 }
 fn main() {
@@ -190,30 +190,8 @@ fn main() {
 
     let current_exe = env::current_exe().expect("Failed to get current executable");
 
-    // Set the environment variable "RUN_BACKGROUND_TASK" to any value (e.g. "1").
-    let child = Command::new(current_exe)
+    Command::new(current_exe)
         .env("RUN_BACKGROUND_TASK", "1")
         .spawn()
         .expect("Failed to start background process");
-    // push
-    // let mut child = Command::new("git")
-    //     .arg("push")
-    //     // .stdout(Stdio::piped())
-    //     // .stderr(Stdio::piped())
-    //     .spawn()
-    //     .unwrap_or_else(|_| {
-    //         eprintln!("{}", "Unable to call 'git push' •◠•".red());
-    //         std::process::exit(1);
-    //     });
-
-    // let handle = thread::spawn(move || {
-    //     let success = child.wait().expect("Failed to wait on child process");
-    //     if !success.success() {
-    //         eprintln!("{}", "Error pushing code •◠•".red());
-    //     } else {
-    //         println!("{}", "Success •◡•".green());
-    //     }
-    // });
-
-    // mem::forget(handle);
 }
