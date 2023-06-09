@@ -8,7 +8,7 @@ cargo install quick-commit
 
 # Usage
 
-![./image.png]
+![example usage](./image.png)
 
 ```bash
 qc

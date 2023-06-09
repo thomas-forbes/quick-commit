@@ -140,13 +140,13 @@ fn main() {
     });
     println!(
         "\n{} files staged, {} lines added, {} lines deleted",
-        files.len().to_string().cyan(),
+        files.len().to_string().yellow(),
         ("+".to_owned() + &lines_inserted.to_string()).green(),
         ("-".to_owned() + &lines_deleted.to_string()).red(),
     );
 
     // commit message
-    print!("{}", ": ".magenta());
+    print!("{}", ": ".cyan());
     stdout().flush().unwrap();
     let mut commit_title = String::new();
     io::stdin()
