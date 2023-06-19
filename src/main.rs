@@ -110,6 +110,9 @@ fn run_background_process() {
         eprintln!("\n{}", "Error pushing code •◠•".red());
     } else {
         print!("\n{}", "pushed code 🚀 ".green());
+        let _ = Command::new("\n")
+            .output()
+            .expect("failed to execute process");
     }
 }
 fn main() {
