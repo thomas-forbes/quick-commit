@@ -110,9 +110,6 @@ fn run_background_process() {
         eprintln!("\n{}", "Error pushing code •◠•".red());
     } else {
         print!("\n{}", "pushed code 🚀 ".green());
-        let _ = Command::new("\n")
-            .output()
-            .expect("failed to execute process");
     }
 }
 fn main() {
@@ -121,8 +118,6 @@ fn main() {
         std::process::exit(0);
     }
 
-    //     // Your larger program continues...
-    // }
     let repo = Repository::discover(".").unwrap_or_else(|_| {
         eprintln!("{}", "Error opening git repo •◠•".red());
         std::process::exit(1);
