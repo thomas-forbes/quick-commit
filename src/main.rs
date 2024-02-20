@@ -7,45 +7,6 @@ use std::io::{self, stdout, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-fn stage(repo: &Repository) -> Result<Vec<(String, git2::Status)>, git2::Error> {
-    let mut index = repo.index()?;
-
-    let mut options = StatusOptions::new();
-    options.include_untracked(true).recurse_untracked_dirs(true);
-
-    let mut files: Vec<(String, git2::Status)> = Vec::new();
-
-    for entry in repo.statuses(Some(&mut options))?.iter() {
-        let path = Path::new(std::str::from_utf8(entry.path_bytes()).unwrap());
-
-        match entry.status() {
-            status if status.intersects(git2::Status::INDEX_NEW | git2::Status::WT_NEW) => {
-                files.push((path.display().to_string(), git2::Status::INDEX_NEW));
-
-                // index.add_path(&path)?;
-            }
-            status
-                if status.intersects(git2::Status::INDEX_MODIFIED | git2::Status::WT_MODIFIED) =>
-            {
-                files.push((path.display().to_string(), git2::Status::INDEX_MODIFIED));
-
-                // index.add_path(&path)?;
-            }
-            status if status.intersects(git2::Status::INDEX_DELETED | git2::Status::WT_DELETED) => {
-                // test
-                files.push((path.display().to_string(), git2::Status::INDEX_DELETED));
-
-                // index.remove_path(&path)?;
-            }
-            _ => continue,
-        }
-    }
-
-    index.write()?; // Write the changes to the index
-
-    Ok(files)
-}
-
 fn get_stats(repo: &Repository) -> Result<(usize, usize, Vec<(String, Status)>), Error> {
     let mut index = repo.index()?;
     let oid = index.write_tree()?;
