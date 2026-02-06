@@ -25,33 +25,54 @@ pub fn generate_commit_info(
     let api_key = env::var("OPENROUTER_API_KEY")
         .map_err(|_| "OPENROUTER_API_KEY environment variable not set".to_string())?;
 
-    let prompt = if new_branch {
-        format!(
-            "Generate a git commit message and a branch name for the following diff.\n
-            The commit message should be concise and descriptive, using conventional commits style (e.g. feat: ..., fix: ..., refactor: ...).\n
-            The branch name should be short, lowercase, kebab-case (e.g. feat/add-auth, fix/login-bug).\n
-            The branch name and commit message should convey the same change but be worded differently.\n
-            Respond ONLY with valid JSON, no markdown fences: {{\"commit_message\": \"...\", \"branch_name\": \"...\"}}\n\n\
-            Diff:\n{}",
-            diff
-        )
+    let branch_step = if new_branch {
+        "\nStep 3 — Write the branch name as: <type>/<short-kebab-case-slug>\n\
+              • Must use the SAME type prefix as the commit message\n\
+              • 2–5 words in the slug, lowercase, separated by hyphens\n\
+              • The slug should describe the change differently from the commit description\n"
     } else {
-        format!(
-            "Generate a git commit message for the following diff.\n\
-            The commit message should be concise and descriptive, using conventional commits style (e.g. feat: ..., fix: ..., refactor: ...).\n\
-            Respond ONLY with valid JSON, no markdown fences: {{\"commit_message\": \"...\"}}\n\n\
-            Diff:\n{}",
-            diff
-        )
+        ""
     };
 
+    let json_schema = if new_branch {
+        "{{\"commit_message\": \"...\", \"branch_name\": \"...\"}}"
+    } else {
+        "{{\"commit_message\": \"...\"}}"
+    };
+
+    let prompt = format!(
+        "Analyze the following diff and generate a commit message{extra}.\n\n\
+        Step 1 — Determine the change type. Pick exactly ONE from this list:\n\
+          feat     — a new feature or capability (default)\n\
+          fix      — a bug or behavior fix\n\
+          refactor — pure code restructuring with **ZERO** behavior change\n\
+          docs     — documentation only\n\
+          style    — formatting, whitespace, linting (no logic change)\n\
+          test     — adding or updating tests\n\
+          chore    — build scripts, deps, config, tooling\n\
+          ci       — CI/CD pipeline changes\n\n\
+        Step 2 — Write the commit message as: <type>: <concise imperative description>\n\
+          • Use the imperative mood (\"add\", not \"added\" or \"adds\")\n\
+          • Keep it under 72 characters\n\
+          • Do NOT capitalize the description\n\
+          • No trailing period\n\
+        {branch_step}\n\
+        Respond ONLY with valid JSON, no markdown fences:\n\
+        {json_schema}\n\n\
+        Diff:\n{diff}",
+        extra = if new_branch { " and branch name" } else { "" },
+        branch_step = branch_step,
+        json_schema = json_schema,
+        diff = diff,
+    );
+
     let body = json!({
-        "model": "openai/gpt-oss-20b",
+        "model": "openai/gpt-oss-120b",
         "provider": {"order": ["groq"]},
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that generates git commit messages. Respond only with valid JSON, no markdown."
+                "content": "You are a git commit message generator that strictly follows Conventional Commits. You always classify changes into exactly one type (feat, fix, refactor, docs, style, test, chore, ci) before writing the message. Respond only with valid JSON, no markdown."
             },
             {
                 "role": "user",
