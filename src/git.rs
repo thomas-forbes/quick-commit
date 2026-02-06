@@ -189,7 +189,6 @@ pub fn stage_and_commit(message: &str) {
         eprintln!("{}", String::from_utf8_lossy(&out.stderr));
         std::process::exit(1);
     }
-    println!("{}", ui::labeled("Committed", message, |s| s.green()));
 }
 
 pub fn push(repo: &Repository, is_new_branch: bool) {
