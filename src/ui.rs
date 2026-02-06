@@ -7,8 +7,19 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+/// Format "Label: value" with only "Label" colored using the given color.
+pub fn labeled(label: &str, value: &str, color_fn: fn(&str) -> ColoredString) -> String {
+    format!("{}: {}", color_fn(label), value)
+}
+
 pub fn prompt_input(label: &str) -> String {
-    print!("{}", label.cyan());
+    if let Some(pos) = label.find(':') {
+        let colored_part = &label[..pos];
+        let rest = &label[pos..];
+        print!("{}{}", colored_part.cyan(), rest);
+    } else {
+        print!("{}", label.cyan());
+    }
     stdout().flush().unwrap();
     let mut input = String::new();
     io::stdin()
@@ -19,8 +30,15 @@ pub fn prompt_input(label: &str) -> String {
 
 /// Wrap a label in cyan ANSI codes with \x01/\x02 markers so rustyline
 /// doesn't count the escape bytes as visible width.
+/// Only the part before the first ':' is colored.
 fn colored_label(label: &str) -> String {
-    format!("\x01\x1b[36m\x02{}\x01\x1b[0m\x02", label)
+    if let Some(pos) = label.find(':') {
+        let colored_part = &label[..pos];
+        let rest = &label[pos..];
+        format!("\x01\x1b[36m\x02{}\x01\x1b[0m\x02{}", colored_part, rest)
+    } else {
+        format!("\x01\x1b[36m\x02{}\x01\x1b[0m\x02", label)
+    }
 }
 
 /// Shows `label` (colored) with `initial` pre-filled as editable text.

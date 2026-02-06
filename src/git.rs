@@ -3,6 +3,8 @@ use std::process::Command;
 
 use colored::*;
 
+use crate::ui;
+
 pub fn get_stats(repo: &Repository) -> Result<(usize, usize, Vec<(String, Status)>), Error> {
     let mut index = repo.index()?;
     let oid = index.write_tree()?;
@@ -169,7 +171,7 @@ pub fn create_branch(repo: &Repository, branch: &str) {
         eprintln!("{}", String::from_utf8_lossy(&out.stderr).red());
         std::process::exit(1);
     }
-    println!("{}", format!("Created branch: {}", branch).green());
+    println!("{}", ui::labeled("Created branch", branch, |s| s.green()));
 }
 
 pub fn stage_and_commit(message: &str) {
@@ -187,7 +189,7 @@ pub fn stage_and_commit(message: &str) {
         eprintln!("{}", String::from_utf8_lossy(&out.stderr));
         std::process::exit(1);
     }
-    println!("{}", format!("Committed: {}", message).green());
+    println!("{}", ui::labeled("Committed", message, |s| s.green()));
 }
 
 pub fn push(repo: &Repository, is_new_branch: bool) {
@@ -214,10 +216,7 @@ pub fn push(repo: &Repository, is_new_branch: bool) {
     });
 
     if is_new_branch {
-        println!(
-            "{}",
-            format!("Pushed to {}", remote_url).purple()
-        );
+        println!("{}", ui::labeled("Pushed to", &remote_url, |s| s.yellow()));
     } else {
         println!("{}", format!("Pushed to {}", remote_url).purple());
     }
