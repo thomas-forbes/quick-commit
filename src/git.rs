@@ -208,7 +208,6 @@ pub fn push(repo: &Repository, is_new_branch: bool) {
         eprintln!("{}", String::from_utf8_lossy(&out.stderr).red());
         std::process::exit(1);
     }
-    print!("{}", String::from_utf8_lossy(&out.stdout).cyan());
 
     let remote_url = get_remote_url(repo, "origin").unwrap_or_else(|_| {
         eprintln!("{}", "Error reading remote url •◠•".red());

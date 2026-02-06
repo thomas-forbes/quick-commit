@@ -52,13 +52,14 @@ fn main() {
         None
     };
 
+    println!("\n");
     if let Some(ref branch) = final_branch {
         git::create_branch(&repo, branch);
     }
 
     git::stage_and_commit(&final_message);
 
-    let push_input = ui::prompt_input("Push to remote? (Y/n): ");
+    let push_input = ui::prompt_input("\nPush to remote? (Y/n): ");
     if !push_input.eq_ignore_ascii_case("n") {
         git::push(&repo, final_branch.is_some());
     }
