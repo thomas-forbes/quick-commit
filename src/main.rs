@@ -1,4 +1,5 @@
 mod ai;
+mod config;
 mod git;
 mod ui;
 
@@ -32,10 +33,15 @@ fn main() {
     let create_new_branch = ui::prompt_input("\nCreate new branch? (y/N): ")
         .eq_ignore_ascii_case("y");
 
+    let api_key = config::get_api_key().unwrap_or_else(|e| {
+        eprintln!("{}", format!("Error: {}", e).red());
+        std::process::exit(1);
+    });
+
     let diff = git::build_diff_context(&files, insertions, deletions);
 
     let spinner = ui::Spinner::start("Generating commit message...");
-    let result = ai::generate_commit_info(&diff, create_new_branch);
+    let result = ai::generate_commit_info(&diff, create_new_branch, &api_key);
     spinner.stop();
 
     let (commit_message, branch_name) = result.unwrap_or_else(|e| {

@@ -1,14 +1,12 @@
 # Quick Commit
 
-# Install
+## Install
 
 ```bash
 cargo install quick-commit
 ```
 
-# Usage
-
-![example usage](./assets/image.png)
+## Usage
 
 ```bash
 qc

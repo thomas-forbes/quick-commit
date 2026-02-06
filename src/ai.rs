@@ -1,5 +1,4 @@
 use serde_json::{json, Value};
-use std::env;
 
 fn strip_code_fences(s: &str) -> &str {
     let s = s.trim();
@@ -21,9 +20,8 @@ fn strip_code_fences(s: &str) -> &str {
 pub fn generate_commit_info(
     diff: &str,
     new_branch: bool,
+    api_key: &str,
 ) -> Result<(String, Option<String>), String> {
-    let api_key = env::var("OPENROUTER_API_KEY")
-        .map_err(|_| "OPENROUTER_API_KEY environment variable not set".to_string())?;
 
     let branch_step = if new_branch {
         "\nStep 3 — Write the branch name as: <type>/<short-kebab-case-slug>\n\
