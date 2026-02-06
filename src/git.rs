@@ -171,7 +171,6 @@ pub fn create_branch(repo: &Repository, branch: &str) {
         eprintln!("{}", String::from_utf8_lossy(&out.stderr).red());
         std::process::exit(1);
     }
-    println!("{}", ui::labeled("Created branch", branch, |s| s.green()));
 }
 
 pub fn stage_and_commit(message: &str) {
