@@ -52,7 +52,6 @@ fn main() {
         None
     };
 
-    println!("\n");
     if let Some(ref branch) = final_branch {
         git::create_branch(&repo, branch);
     }

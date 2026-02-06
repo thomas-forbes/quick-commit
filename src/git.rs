@@ -215,8 +215,8 @@ pub fn push(repo: &Repository, is_new_branch: bool) {
     });
 
     if is_new_branch {
-        println!("{}", ui::labeled("Pushed to", &remote_url, |s| s.yellow()));
+        println!("{}", ui::labeled("Pushed to", &remote_url, |s| s.purple()));
     } else {
-        println!("{}", format!("Pushed to {}", remote_url).purple());
+        println!("{}", ui::labeled("Pushed to", &remote_url, |s| s.purple()));
     }
 }
