@@ -67,6 +67,19 @@ pub fn build_diff_context(
 ) -> String {
     let mut ctx = String::new();
 
+    // -- Repo context (branch + recent commits) --
+    let branch = git_command_output(&["rev-parse", "--abbrev-ref", "HEAD"])
+        .unwrap_or_else(|| "unknown".to_string());
+    let log = git_command_output(&["log", "-n", "5", "--oneline"])
+        .unwrap_or_else(|| "unavailable".to_string());
+    ctx.push_str("== Repo Context ==\n");
+    ctx.push_str(&format!("Branch: {}\n", branch));
+    ctx.push_str("Recent commits:\n");
+    for line in log.lines() {
+        ctx.push_str(&format!("{}\n", line));
+    }
+    ctx.push('\n');
+
     // -- File summary header with per-file stats --
     let numstat = collect_numstat();
     ctx.push_str("== Changed Files ==\n");
@@ -153,6 +166,19 @@ fn collect_numstat() -> std::collections::HashMap<String, (usize, usize)> {
     }
 
     map
+}
+
+fn git_command_output(args: &[&str]) -> Option<String> {
+    let out = Command::new("git").args(args).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
+    }
 }
 
 pub fn create_branch(repo: &Repository, branch: &str) {
