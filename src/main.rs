@@ -1,99 +1,78 @@
 use colored::*;
-use git2::{Config, ErrorCode, Repository, Signature, StatusOptions};
+use git2::{
+    Config, DiffOptions, Error, ErrorCode, Repository, Signature, Status, StatusOptions, StatusShow,
+};
 use std::env;
 use std::io::{self, stdout, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-fn stage(repo: &Repository) -> Result<Vec<(String, git2::Status)>, git2::Error> {
-    let mut index = repo.index()?;
-
-    let mut options = StatusOptions::new();
-    options.include_untracked(true).recurse_untracked_dirs(true);
-
-    let mut files: Vec<(String, git2::Status)> = Vec::new();
-
-    for entry in repo.statuses(Some(&mut options))?.iter() {
-        let path = Path::new(std::str::from_utf8(entry.path_bytes()).unwrap());
-
-        match entry.status() {
-            status if status.intersects(git2::Status::INDEX_NEW | git2::Status::WT_NEW) => {
-                files.push((path.display().to_string(), git2::Status::INDEX_NEW));
-
-                index.add_path(&path)?;
-            }
-            status
-                if status.intersects(git2::Status::INDEX_MODIFIED | git2::Status::WT_MODIFIED) =>
-            {
-                files.push((path.display().to_string(), git2::Status::INDEX_MODIFIED));
-
-                index.add_path(&path)?;
-            }
-            status if status.intersects(git2::Status::INDEX_DELETED | git2::Status::WT_DELETED) => {
-                // test
-                files.push((path.display().to_string(), git2::Status::INDEX_DELETED));
-
-                index.remove_path(&path)?;
-            }
-            _ => continue,
-        }
-    }
-
-    index.write()?; // Write the changes to the index
-
-    Ok(files)
-}
-
-fn commit(repo: &Repository, message: &str) -> Result<(), git2::Error> {
-    let mut index = repo.index()?;
-    let tree_oid = index.write_tree()?;
-    let tree = repo.find_tree(tree_oid)?;
-
-    let config = Config::open_default()?;
-    let name = config.get_string("user.name")?;
-    let email = config.get_string("user.email")?;
-
-    let signature = Signature::now(&name, &email)?;
-
-    let head = repo.head();
-    let head = match head {
-        Ok(head) => head,
-        Err(ref e) if e.code() == ErrorCode::UnbornBranch => {
-            repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[])?;
-            return Ok(());
-        }
-        Err(e) => return Err(e),
-    };
-
-    let head_commit = repo.find_commit(head.target().unwrap())?;
-
-    repo.commit(
-        Some("HEAD"),
-        &signature,
-        &signature,
-        message,
-        &tree,
-        &[&head_commit],
-    )?;
-
-    Ok(())
-}
-
-fn lines(repo: &Repository) -> Result<(usize, usize), git2::Error> {
+fn get_stats(repo: &Repository) -> Result<(usize, usize, Vec<(String, Status)>), Error> {
     let mut index = repo.index()?;
     let oid = index.write_tree()?;
     let tree = repo.find_tree(oid)?;
-
     let head_commit = repo.head()?.peel_to_commit()?;
     let head_tree = head_commit.tree()?;
 
-    let diff = repo.diff_tree_to_tree(Some(&head_tree), Some(&tree), None)?;
+    let diff_staged = repo.diff_tree_to_tree(Some(&head_tree), Some(&tree), None)?;
+    let mut opts = DiffOptions::new();
+    opts.include_untracked(true);
+    let diff_unstaged = repo.diff_index_to_workdir(Some(&index), Some(&mut opts))?;
 
-    Ok((diff.stats()?.insertions(), diff.stats()?.deletions()))
+    let insertions = diff_staged.stats()?.insertions() + diff_unstaged.stats()?.insertions();
+    let deletions = diff_staged.stats()?.deletions() + diff_unstaged.stats()?.deletions();
+
+    // Get file statuses for both staged and unstaged changes
+    let mut status_opts = StatusOptions::new();
+    status_opts.show(StatusShow::IndexAndWorkdir);
+    status_opts.include_untracked(true);
+    status_opts.include_ignored(false);
+    status_opts.renames_head_to_index(true);
+    status_opts.renames_index_to_workdir(true);
+    let statuses = repo.statuses(Some(&mut status_opts))?;
+
+    let mut files: Vec<(String, Status)> = Vec::new();
+
+    for entry in statuses.iter() {
+        let status = entry.status();
+        // Check for both index (staged) and workdir (unstaged) changes
+        if status.intersects(
+            Status::INDEX_NEW
+                | Status::INDEX_MODIFIED
+                | Status::INDEX_DELETED
+                | Status::WT_NEW
+                | Status::WT_MODIFIED
+                | Status::WT_DELETED,
+        ) {
+            if let Some(path) = entry.path() {
+                files.push((String::from(path), status));
+            }
+        }
+    }
+
+    Ok((insertions, deletions, files))
+}
+
+fn branch_exists(repo: &Repository, branch_name: &str) -> Result<bool, Error> {
+    // Try to find the branch locally
+    match repo.find_branch(branch_name, git2::BranchType::Local) {
+        Ok(_) => return Ok(true),
+        Err(_) => {
+            // If not found locally, try to find it remotely
+            match repo.find_branch(branch_name, git2::BranchType::Remote) {
+                Ok(_) => return Ok(true),
+                Err(_) => return Ok(false),
+            }
+        }
+    }
+}
+
+fn get_remote_url(repo: &Repository, remote_name: &str) -> Result<String, Error> {
+    let remote = repo.find_remote(remote_name)?;
+    Ok(remote.url().unwrap_or_default().to_string())
 }
 
 fn main() {
-
     let repo = Repository::discover(".").unwrap_or_else(|_| {
         eprintln!("{}", "Error opening git repo •◠•".red());
         std::process::exit(1);
@@ -109,9 +88,9 @@ fn main() {
             .cyan()
     );
 
-    // stage changes
-    let files = stage(&repo).unwrap_or_else(|_| {
-        eprintln!("{}", "Error staging files •◠•".red());
+    // commit info
+    let (lines_inserted, lines_deleted, files) = get_stats(&repo).unwrap_or_else(|_| {
+        eprintln!("{}", "Error reading git info •◠•".red());
         std::process::exit(1);
     });
     if files.len() == 0 {
@@ -121,27 +100,21 @@ fn main() {
     for (path, status) in &files {
         let print_path = path;
         match status {
-            &git2::Status::INDEX_NEW => {
+            &Status::INDEX_NEW | &Status::WT_NEW => {
                 print!("{}", ("+ ".to_owned() + &print_path).green())
             }
-            &git2::Status::INDEX_MODIFIED => {
+            &Status::INDEX_MODIFIED | &Status::WT_MODIFIED => {
                 print!("{}", ("M ".to_owned() + &print_path).yellow())
             }
-            &git2::Status::INDEX_DELETED => {
+            &Status::INDEX_DELETED | &Status::WT_DELETED => {
                 print!("{}", ("- ".to_owned() + &print_path).red())
             }
             _ => continue,
         }
         println!();
     }
-
-    // commit info
-    let (lines_inserted, lines_deleted) = lines(&repo).unwrap_or_else(|_| {
-        eprintln!("{}", "Error reading git info •◠•".red());
-        std::process::exit(1);
-    });
     println!(
-        "\n{} files staged, {} lines added, {} lines deleted",
+        "\n{} files changed, {} lines added, {} lines deleted",
         files.len().to_string().yellow(),
         ("+".to_owned() + &lines_inserted.to_string()).green(),
         ("-".to_owned() + &lines_deleted.to_string()).red(),
@@ -156,30 +129,62 @@ fn main() {
         .expect("Failed to read input");
     let commit_title = commit_title.trim();
 
-    // commit
-    commit(&repo, commit_title).unwrap_or_else(|_| {
-        eprintln!("{}", "Error committing changes •◠•".red());
+    let branch_name = commit_title.replace(" ", "-");
+
+    if branch_exists(&repo, &branch_name).unwrap() {
+        eprintln!("{}", "Branch already exists •◠•".red());
+        std::process::exit(1);
+    }
+
+    Command::new("git")
+        .arg("checkout")
+        .arg("-b")
+        .arg(&branch_name)
+        .output()
+        .expect("failed to execute process");
+
+    Command::new("git")
+        .arg("add")
+        .arg("--all")
+        .output()
+        .expect("failed to execute process");
+
+    Command::new("git")
+        .arg("commit")
+        .arg("-m")
+        .arg(&commit_title)
+        .output()
+        .expect("failed to execute process");
+
+    // ask if they want to push
+    print!("{}", "Push to remote? (Y/n): ".cyan());
+    stdout().flush().unwrap();
+    let mut push = String::new();
+    io::stdin()
+        .read_line(&mut push)
+        .expect("Failed to read input");
+    let push = push.trim();
+    if push == "n" {
+        std::process::exit(0);
+    }
+
+    let out = Command::new("git")
+        .arg("push")
+        .output()
+        .expect("failed to push");
+    print!("{}", String::from_utf8_lossy(&out.stdout).cyan());
+
+    let remote_url = get_remote_url(&repo, "origin").unwrap_or_else(|_| {
+        eprintln!("{}", "Error reading remote url •◠•".red());
         std::process::exit(1);
     });
 
-    // let current_exe = env::current_exe().expect("Failed to get current executable");
-    
-    // push
-    let mut child = Command::new("git")
-        .arg("push")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap_or_else(|_| {
-            eprintln!("{}", "Unable to call 'git push' •◠•".red());
-            std::process::exit(1);
-        });
-
-    let success = child.wait().expect("Failed to wait on child process");
-
-    if !success.success() {
-        eprintln!("\n{}", "Error pushing code •◠•".red());
-    } else {
-        print!("\n{}", "pushed code 🚀 ".green());
-    }
+    println!(
+        "{}",
+        format!(
+            "Branch {} created and pushed to {}",
+            branch_name, remote_url
+        )
+        .purple()
+    );
 }
