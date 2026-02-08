@@ -21,6 +21,7 @@ pub fn generate_commit_info(
     diff: &str,
     new_branch: bool,
     api_key: &str,
+    model: &str,
 ) -> Result<(String, Option<String>), String> {
 
     let branch_step = if new_branch {
@@ -65,7 +66,7 @@ pub fn generate_commit_info(
     );
 
     let body = json!({
-        "model": "openai/gpt-oss-120b",
+        "model": model,
         "provider": {"order": ["groq"]},
         "messages": [
             {

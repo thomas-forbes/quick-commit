@@ -14,6 +14,23 @@ cargo install quick-commit
 qc
 ```
 
+## Configuration
+
+Quick Commit stores settings in `~/.config/quick-commit/config.toml` and
+also reads environment variables for overrides.
+
+Environment variables:
+
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL`
+
+Example `config.toml`:
+
+```toml
+api_key = "your-api-key"
+model = "openai/gpt-oss-120b"
+```
+
 ## Example
 
 ```

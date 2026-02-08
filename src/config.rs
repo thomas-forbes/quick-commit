@@ -8,7 +8,10 @@ use crate::ui;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Config {
     pub api_key: Option<String>,
+    pub model: Option<String>,
 }
+
+const DEFAULT_MODEL: &str = "openai/gpt-oss-120b";
 
 /// Return the path to the config file: ~/.config/quick-commit/config.toml
 fn config_path() -> Result<PathBuf, String> {
@@ -74,4 +77,43 @@ pub fn get_api_key() -> Result<String, String> {
     println!("API key saved to {}", path.display());
 
     Ok(key)
+}
+
+/// Resolve the model with the following priority:
+/// 1. OPENROUTER_MODEL env var
+/// 2. Config file (~/.config/quick-commit/config.toml)
+/// 3. Prompt the user (defaults to DEFAULT_MODEL), then save to config file
+pub fn get_model() -> Result<String, String> {
+    // 1. Check env var first (allows overrides / CI usage)
+    if let Ok(model) = env::var("OPENROUTER_MODEL") {
+        if !model.is_empty() {
+            return Ok(model);
+        }
+    }
+
+    // 2. Check config file
+    let mut config = load_config()?;
+    if let Some(ref model) = config.model {
+        if !model.is_empty() {
+            return Ok(model.clone());
+        }
+    }
+
+    // 3. Prompt the user (default if empty)
+    let prompt = format!("Enter OpenRouter model [{}]: ", DEFAULT_MODEL);
+    let input = ui::prompt_input(&prompt);
+    let model = if input.is_empty() {
+        DEFAULT_MODEL.to_string()
+    } else {
+        input
+    };
+
+    // Save for next time
+    config.model = Some(model.clone());
+    save_config(&config)?;
+
+    let path = config_path().unwrap_or_default();
+    println!("Model saved to {}", path.display());
+
+    Ok(model)
 }

@@ -38,10 +38,15 @@ fn main() {
         std::process::exit(1);
     });
 
+    let model = config::get_model().unwrap_or_else(|e| {
+        eprintln!("{}", format!("Error: {}", e).red());
+        std::process::exit(1);
+    });
+
     let diff = git::build_diff_context(&files, insertions, deletions);
 
     let spinner = ui::Spinner::start("Generating commit message...");
-    let result = ai::generate_commit_info(&diff, create_new_branch, &api_key);
+    let result = ai::generate_commit_info(&diff, create_new_branch, &api_key, &model);
     spinner.stop();
 
     let (commit_message, branch_name) = result.unwrap_or_else(|e| {
