@@ -5,6 +5,7 @@ mod ui;
 
 use colored::*;
 use git2::Repository;
+use std::thread;
 
 fn main() {
     let repo = Repository::discover(".").unwrap_or_else(|_| {
@@ -30,14 +31,11 @@ fn main() {
     }
     ui::print_changes(&files, insertions, deletions);
 
-    let create_new_branch = ui::prompt_input("\nCreate new branch? (y/N): ")
-        .eq_ignore_ascii_case("y");
-
+    // Resolve config before spawning (may prompt user on first run)
     let api_key = config::get_api_key().unwrap_or_else(|e| {
         eprintln!("{}", format!("Error: {}", e).red());
         std::process::exit(1);
     });
-
     let model = config::get_model().unwrap_or_else(|e| {
         eprintln!("{}", format!("Error: {}", e).red());
         std::process::exit(1);
@@ -45,14 +43,25 @@ fn main() {
 
     let diff = git::build_diff_context(&files, insertions, deletions);
 
+    // Start AI generation in background — always request branch name so we
+    // don't block on the user's branch choice before firing the request.
+    let ai_handle = thread::spawn(move || {
+        ai::generate_commit_info(&diff, true, &api_key, &model)
+    });
+
+    // While AI is working, ask the user about creating a new branch
+    let create_new_branch = ui::prompt_input("\nCreate new branch? (y/N): ")
+        .eq_ignore_ascii_case("y");
+
+    // Wait for the AI result (spinner shown only while still pending)
     let spinner = ui::Spinner::start("Generating commit message...");
-    let result = ai::generate_commit_info(&diff, create_new_branch, &api_key, &model);
+    let result = ai_handle.join().unwrap_or_else(|_| Err("AI thread panicked".to_string()));
     spinner.stop();
 
     let (commit_message, branch_name) = result.unwrap_or_else(|e| {
         eprintln!("{}", format!("AI generation failed: {}", e).red());
         eprintln!("{}", "Falling back to manual input.".yellow());
-        (String::new(), if create_new_branch { Some(String::new()) } else { None })
+        (String::new(), Some(String::new()))
     });
 
     // Present AI-generated text as editable — just press Enter to accept, or edit inline
