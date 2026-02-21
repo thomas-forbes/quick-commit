@@ -65,9 +65,9 @@ fn main() {
     });
 
     // Present AI-generated text as editable — just press Enter to accept, or edit inline
-    let final_message = ui::editable_prompt("Commit: ", &commit_message);
+    let final_message = ui::editable_prompt("Commit: ", &commit_message).trim().to_string();
     let final_branch = if create_new_branch {
-        Some(ui::editable_prompt("Branch: ", &branch_name.unwrap_or_default()))
+        Some(ui::editable_prompt("Branch: ", &branch_name.unwrap_or_default()).trim().to_string())
     } else {
         None
     };
