@@ -21,6 +21,7 @@ fn main() {
         .unwrap_or("no name");
     ui::print_repo_name(repo_name);
 
+    git::stage_all();
     let (insertions, deletions, files) = git::get_stats(&repo).unwrap_or_else(|_| {
         eprintln!("{}", "Error reading git info •◠•".red());
         std::process::exit(1);
@@ -55,12 +56,14 @@ fn main() {
     });
 
     // While AI is working, ask the user about creating a new branch
-    let create_new_branch = ui::prompt_input("\nCreate new branch? (y/N): ")
-        .eq_ignore_ascii_case("y");
+    let create_new_branch =
+        ui::prompt_input("\nCreate new branch? (y/N): ").eq_ignore_ascii_case("y");
 
     // Wait for the AI result (spinner shown only while still pending)
     let spinner = ui::Spinner::start("Generating commit message...");
-    let result = ai_handle.join().unwrap_or_else(|_| Err("AI thread panicked".to_string()));
+    let result = ai_handle
+        .join()
+        .unwrap_or_else(|_| Err("AI thread panicked".to_string()));
     spinner.stop();
 
     let (commit_message, branch_name) = result.unwrap_or_else(|e| {
@@ -70,9 +73,15 @@ fn main() {
     });
 
     // Present AI-generated text as editable — just press Enter to accept, or edit inline
-    let final_message = ui::editable_prompt("Commit: ", &commit_message.trim()).trim().to_string();
+    let final_message = ui::editable_prompt("Commit: ", &commit_message.trim())
+        .trim()
+        .to_string();
     let final_branch = if create_new_branch {
-        Some(ui::editable_prompt("Branch: ", &branch_name.unwrap_or_default().trim()).trim().to_string())
+        Some(
+            ui::editable_prompt("Branch: ", &branch_name.unwrap_or_default().trim())
+                .trim()
+                .to_string(),
+        )
     } else {
         None
     };

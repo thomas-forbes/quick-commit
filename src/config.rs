@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::fs;
 use std::path::PathBuf;
 
@@ -81,19 +80,8 @@ fn save_config(config: &Config) -> Result<(), String> {
     fs::write(&path, contents).map_err(|e| format!("Failed to write config: {}", e))
 }
 
-/// Resolve the API key with the following priority:
-/// 1. OPENROUTER_API_KEY env var
-/// 2. Config file (~/.config/quick-commit/config.toml)
-/// 3. Prompt the user, then save to config file
+/// Resolve the API key from config file, prompting the user if not set.
 pub fn get_api_key() -> Result<String, String> {
-    // 1. Check env var first (allows overrides / CI usage)
-    if let Ok(key) = env::var("OPENROUTER_API_KEY") {
-        if !key.is_empty() {
-            return Ok(key);
-        }
-    }
-
-    // 2. Check config file
     let mut config = load_config()?;
     if let Some(ref key) = config.api_key {
         if !key.is_empty() {
@@ -117,19 +105,8 @@ pub fn get_api_key() -> Result<String, String> {
     Ok(key)
 }
 
-/// Resolve the model with the following priority:
-/// 1. OPENROUTER_MODEL env var
-/// 2. Config file (~/.config/quick-commit/config.toml)
-/// 3. Prompt the user (defaults to DEFAULT_MODEL), then save to config file
+/// Resolve the model from config file, prompting the user if not set.
 pub fn get_model() -> Result<String, String> {
-    // 1. Check env var first (allows overrides / CI usage)
-    if let Ok(model) = env::var("OPENROUTER_MODEL") {
-        if !model.is_empty() {
-            return Ok(model);
-        }
-    }
-
-    // 2. Check config file
     let mut config = load_config()?;
     if let Some(ref model) = config.model {
         if !model.is_empty() {

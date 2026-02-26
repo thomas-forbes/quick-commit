@@ -1,31 +1,34 @@
-use git2::{DiffOptions, Error, Repository, Status, StatusOptions, StatusShow};
+use git2::{Error, Repository, Status, StatusOptions, StatusShow};
 use std::process::Command;
 
 use colored::*;
 
 use crate::ui;
 
+pub fn stage_all() {
+    Command::new("git")
+        .args(["add", "--all"])
+        .output()
+        .expect("failed to stage files");
+}
+
 pub fn get_stats(repo: &Repository) -> Result<(usize, usize, Vec<(String, Status)>), Error> {
+    // Re-read index after staging
     let mut index = repo.index()?;
+    index.read(false)?;
     let oid = index.write_tree()?;
     let tree = repo.find_tree(oid)?;
     let head_commit = repo.head()?.peel_to_commit()?;
     let head_tree = head_commit.tree()?;
 
-    let diff_staged = repo.diff_tree_to_tree(Some(&head_tree), Some(&tree), None)?;
-    let mut opts = DiffOptions::new();
-    opts.include_untracked(true);
-    let diff_unstaged = repo.diff_index_to_workdir(Some(&index), Some(&mut opts))?;
-
-    let insertions = diff_staged.stats()?.insertions() + diff_unstaged.stats()?.insertions();
-    let deletions = diff_staged.stats()?.deletions() + diff_unstaged.stats()?.deletions();
+    let diff = repo.diff_tree_to_tree(Some(&head_tree), Some(&tree), None)?;
+    let insertions = diff.stats()?.insertions();
+    let deletions = diff.stats()?.deletions();
 
     let mut status_opts = StatusOptions::new();
-    status_opts.show(StatusShow::IndexAndWorkdir);
-    status_opts.include_untracked(true);
+    status_opts.show(StatusShow::Index);
     status_opts.include_ignored(false);
     status_opts.renames_head_to_index(true);
-    status_opts.renames_index_to_workdir(true);
     let statuses = repo.statuses(Some(&mut status_opts))?;
 
     let mut files: Vec<(String, Status)> = Vec::new();
@@ -35,13 +38,24 @@ pub fn get_stats(repo: &Repository) -> Result<(usize, usize, Vec<(String, Status
             Status::INDEX_NEW
                 | Status::INDEX_MODIFIED
                 | Status::INDEX_DELETED
-                | Status::WT_NEW
-                | Status::WT_MODIFIED
-                | Status::WT_DELETED,
+                | Status::INDEX_RENAMED
+                | Status::INDEX_TYPECHANGE,
         ) {
-            if let Some(path) = entry.path() {
-                files.push((String::from(path), status));
-            }
+            let path = if status.intersects(Status::INDEX_RENAMED) {
+                if let Some(delta) = entry.head_to_index() {
+                    let old = delta.old_file().path().and_then(|p| p.to_str()).unwrap_or("?");
+                    let new = delta.new_file().path().and_then(|p| p.to_str()).unwrap_or("?");
+                    format!("{} → {}", old, new)
+                } else {
+                    entry.path().unwrap_or("?").to_string()
+                }
+            } else {
+                match entry.path() {
+                    Some(p) => p.to_string(),
+                    None => continue,
+                }
+            };
+            files.push((path, status));
         }
     }
 
@@ -85,9 +99,11 @@ pub fn build_diff_context(
     ctx.push_str("== Changed Files ==\n");
     for (path, status) in files {
         let prefix = match *status {
-            Status::INDEX_NEW | Status::WT_NEW => "+",
-            Status::INDEX_MODIFIED | Status::WT_MODIFIED => "M",
-            Status::INDEX_DELETED | Status::WT_DELETED => "-",
+            Status::INDEX_NEW => "+",
+            Status::INDEX_MODIFIED => "M",
+            Status::INDEX_DELETED => "-",
+            Status::INDEX_RENAMED => "R",
+            Status::INDEX_TYPECHANGE => "T",
             _ => "?",
         };
         let stats = numstat
@@ -103,36 +119,15 @@ pub fn build_diff_context(
         deletions,
     ));
 
-    // -- Full diff body --
+    // -- Full diff body (everything is staged) --
     ctx.push_str("\n== Diff ==\n");
 
     let staged = Command::new("git")
         .args(["diff", "--cached"])
         .output()
         .expect("failed to get staged diff");
-    let unstaged = Command::new("git")
-        .args(["diff"])
-        .output()
-        .expect("failed to get unstaged diff");
-    let untracked = Command::new("git")
-        .args(["ls-files", "--others", "--exclude-standard"])
-        .output()
-        .expect("failed to get untracked files");
 
     ctx.push_str(&String::from_utf8_lossy(&staged.stdout));
-    ctx.push_str(&String::from_utf8_lossy(&unstaged.stdout));
-
-    let untracked_files = String::from_utf8_lossy(&untracked.stdout);
-    for file in untracked_files.lines() {
-        if !file.is_empty() {
-            ctx.push_str(&format!("\n--- /dev/null\n+++ b/{}\n", file));
-            if let Ok(content) = std::fs::read_to_string(file) {
-                for line in content.lines() {
-                    ctx.push_str(&format!("+{}\n", line));
-                }
-            }
-        }
-    }
 
     const MAX_CONTEXT_LEN: usize = 100_000;
     if ctx.len() > MAX_CONTEXT_LEN {
@@ -147,7 +142,7 @@ pub fn build_diff_context(
 fn collect_numstat() -> std::collections::HashMap<String, (usize, usize)> {
     let mut map = std::collections::HashMap::new();
 
-    for args in [&["diff", "--numstat", "--cached"][..], &["diff", "--numstat"][..]] {
+    for args in [&["diff", "--numstat", "--cached"][..]] {
         let out = Command::new("git")
             .args(args)
             .output()
@@ -200,11 +195,6 @@ pub fn create_branch(repo: &Repository, branch: &str) {
 }
 
 pub fn stage_and_commit(message: &str) {
-    Command::new("git")
-        .args(["add", "--all"])
-        .output()
-        .expect("failed to stage files");
-
     let out = Command::new("git")
         .args(["commit", "-m", message])
         .output()

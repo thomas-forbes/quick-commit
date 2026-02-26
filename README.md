@@ -16,19 +16,14 @@ qc
 
 ## Configuration
 
-Quick Commit stores settings in `~/.config/quick-commit/config.toml` and
-also reads environment variables for overrides.
-
-Environment variables:
-
-- `OPENROUTER_API_KEY`
-- `OPENROUTER_MODEL`
+Quick Commit stores settings in `~/.config/quick-commit/config.toml`.
+On first run, you'll be prompted for your API key and model.
 
 Example `config.toml`:
 
 ```toml
 api_key = "your-api-key"
-model = "openai/gpt-oss-120b"
+model = "openai/gpt-oss-20b"
 ```
 
 ## Example
@@ -38,6 +33,7 @@ quick-commit
 M src/main.rs
 + src/config.rs
 - old_file.rs
+R utils.rs → helpers.rs
 3 files changed, 45 lines added, 12 lines deleted
 
 Create new branch? (y/N): y

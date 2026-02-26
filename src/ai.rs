@@ -26,7 +26,6 @@ pub fn generate_commit_info(
     model: &str,
     semantic_types: &[SemanticType],
 ) -> Result<(String, Option<String>), String> {
-
     let branch_step = if new_branch {
         "\nStep 3 — Write the branch name as: <type>/<short-kebab-case-slug>\n\
               • Must use the SAME type prefix as the commit message\n\
@@ -42,10 +41,21 @@ pub fn generate_commit_info(
         "{{\"commit_message\": \"...\"}}"
     };
 
-    let max_name_len = semantic_types.iter().map(|t| t.name.len()).max().unwrap_or(0);
+    let max_name_len = semantic_types
+        .iter()
+        .map(|t| t.name.len())
+        .max()
+        .unwrap_or(0);
     let types_list: String = semantic_types
         .iter()
-        .map(|t| format!("  {:<width$} — {}", t.name, t.description, width = max_name_len))
+        .map(|t| {
+            format!(
+                "  {:<width$} — {}",
+                t.name,
+                t.description,
+                width = max_name_len
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n");
 

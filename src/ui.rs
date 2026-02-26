@@ -62,16 +62,12 @@ pub fn print_repo_name(name: &str) {
 pub fn print_changes(files: &[(String, Status)], insertions: usize, deletions: usize) {
     for (path, status) in files {
         match *status {
-            Status::INDEX_NEW | Status::WT_NEW => {
-                print!("{}", ("+ ".to_owned() + path).green())
-            }
-            Status::INDEX_MODIFIED | Status::WT_MODIFIED => {
-                print!("{}", ("M ".to_owned() + path).yellow())
-            }
-            Status::INDEX_DELETED | Status::WT_DELETED => {
-                print!("{}", ("- ".to_owned() + path).red())
-            }
-            _ => continue,
+            Status::INDEX_NEW => print!("{}", ("+ ".to_owned() + path).green()),
+            Status::INDEX_MODIFIED => print!("{}", ("M ".to_owned() + path).yellow()),
+            Status::INDEX_DELETED => print!("{}", ("- ".to_owned() + path).red()),
+            Status::INDEX_RENAMED => print!("{}", ("R ".to_owned() + path).purple()),
+            Status::INDEX_TYPECHANGE => print!("{}", ("T ".to_owned() + path).purple()),
+            _ => print!("{}", ("? ".to_owned() + path).dimmed()),
         }
         println!();
     }
