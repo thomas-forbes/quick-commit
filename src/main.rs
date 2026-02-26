@@ -41,12 +41,17 @@ fn main() {
         std::process::exit(1);
     });
 
+    let semantic_types = config::get_semantic_types().unwrap_or_else(|e| {
+        eprintln!("{}", format!("Error: {}", e).red());
+        std::process::exit(1);
+    });
+
     let diff = git::build_diff_context(&files, insertions, deletions);
 
     // Start AI generation in background — always request branch name so we
     // don't block on the user's branch choice before firing the request.
     let ai_handle = thread::spawn(move || {
-        ai::generate_commit_info(&diff, true, &api_key, &model)
+        ai::generate_commit_info(&diff, true, &api_key, &model, &semantic_types)
     });
 
     // While AI is working, ask the user about creating a new branch

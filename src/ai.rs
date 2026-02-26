@@ -1,5 +1,7 @@
 use serde_json::{json, Value};
 
+use crate::config::SemanticType;
+
 fn strip_code_fences(s: &str) -> &str {
     let s = s.trim();
     let s = if s.starts_with("```json") {
@@ -22,6 +24,7 @@ pub fn generate_commit_info(
     new_branch: bool,
     api_key: &str,
     model: &str,
+    semantic_types: &[SemanticType],
 ) -> Result<(String, Option<String>), String> {
 
     let branch_step = if new_branch {
@@ -39,17 +42,23 @@ pub fn generate_commit_info(
         "{{\"commit_message\": \"...\"}}"
     };
 
+    let max_name_len = semantic_types.iter().map(|t| t.name.len()).max().unwrap_or(0);
+    let types_list: String = semantic_types
+        .iter()
+        .map(|t| format!("  {:<width$} — {}", t.name, t.description, width = max_name_len))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let type_names: String = semantic_types
+        .iter()
+        .map(|t| t.name.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+
     let prompt = format!(
         "Analyze the following diff and generate a commit message{extra}.\n\n\
         Step 1 — Determine the change type. Pick exactly ONE from this list:\n\
-          feat     — a new feature or capability (default)\n\
-          fix      — a bug or behavior fix\n\
-          refactor — pure code restructuring with **ZERO** behavior change\n\
-          docs     — documentation only\n\
-          style    — formatting, whitespace, linting (no logic change)\n\
-          test     — adding or updating tests\n\
-          chore    — build scripts, deps, config, tooling\n\
-          ci       — CI/CD pipeline changes\n\n\
+        {types_list}\n\n\
         Step 2 — Write the commit message as: <type>: <concise imperative description>\n\
           • Use the imperative mood (\"add\", not \"added\" or \"adds\")\n\
           • Keep it under 72 characters\n\
@@ -60,6 +69,7 @@ pub fn generate_commit_info(
         {json_schema}\n\n\
         Diff:\n{diff}",
         extra = if new_branch { " and branch name" } else { "" },
+        types_list = types_list,
         branch_step = branch_step,
         json_schema = json_schema,
         diff = diff,
@@ -71,7 +81,7 @@ pub fn generate_commit_info(
         "messages": [
             {
                 "role": "system",
-                "content": "You are a git commit message generator that strictly follows Conventional Commits. You always classify changes into exactly one type (feat, fix, refactor, docs, style, test, chore, ci) before writing the message. Respond only with valid JSON, no markdown."
+                "content": format!("You are a git commit message generator that strictly follows Conventional Commits. You always classify changes into exactly one type ({}) before writing the message. Respond only with valid JSON, no markdown.", type_names)
             },
             {
                 "role": "user",

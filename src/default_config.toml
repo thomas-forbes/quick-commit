@@ -1,0 +1,30 @@
+version = 1
+model = "openai/gpt-oss-20b"
+
+[[semantic_types]]
+name = "feat"
+description = "a new feature or capability (default)"
+
+[[semantic_types]]
+name = "fix"
+description = "a bug or behavior fix"
+
+[[semantic_types]]
+name = "refactor"
+description = "pure code restructuring with ZERO behavior change"
+
+[[semantic_types]]
+name = "docs"
+description = "documentation only"
+
+[[semantic_types]]
+name = "test"
+description = "adding or updating tests"
+
+[[semantic_types]]
+name = "chore"
+description = "build scripts, deps, config, tooling"
+
+[[semantic_types]]
+name = "ci"
+description = "CI/CD pipeline changes"
