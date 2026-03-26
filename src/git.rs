@@ -43,8 +43,16 @@ pub fn get_stats(repo: &Repository) -> Result<(usize, usize, Vec<(String, Status
         ) {
             let path = if status.intersects(Status::INDEX_RENAMED) {
                 if let Some(delta) = entry.head_to_index() {
-                    let old = delta.old_file().path().and_then(|p| p.to_str()).unwrap_or("?");
-                    let new = delta.new_file().path().and_then(|p| p.to_str()).unwrap_or("?");
+                    let old = delta
+                        .old_file()
+                        .path()
+                        .and_then(|p| p.to_str())
+                        .unwrap_or("?");
+                    let new = delta
+                        .new_file()
+                        .path()
+                        .and_then(|p| p.to_str())
+                        .unwrap_or("?");
                     format!("{} → {}", old, new)
                 } else {
                     entry.path().unwrap_or("?").to_string()
@@ -63,8 +71,11 @@ pub fn get_stats(repo: &Repository) -> Result<(usize, usize, Vec<(String, Status
 }
 
 pub fn branch_exists(repo: &Repository, branch_name: &str) -> bool {
-    repo.find_branch(branch_name, git2::BranchType::Local).is_ok()
-        || repo.find_branch(branch_name, git2::BranchType::Remote).is_ok()
+    repo.find_branch(branch_name, git2::BranchType::Local)
+        .is_ok()
+        || repo
+            .find_branch(branch_name, git2::BranchType::Remote)
+            .is_ok()
 }
 
 pub fn get_remote_url(repo: &Repository, remote_name: &str) -> Result<String, Error> {
@@ -84,7 +95,7 @@ pub fn build_diff_context(
     // -- Repo context (branch + recent commits) --
     let branch = git_command_output(&["rev-parse", "--abbrev-ref", "HEAD"])
         .unwrap_or_else(|| "unknown".to_string());
-    let log = git_command_output(&["log", "-n", "5", "--oneline"])
+    let log = git_command_output(&["log", "-n", "5", "--stat", "--oneline"])
         .unwrap_or_else(|| "unavailable".to_string());
     ctx.push_str("== Repo Context ==\n");
     ctx.push_str(&format!("Branch: {}\n", branch));

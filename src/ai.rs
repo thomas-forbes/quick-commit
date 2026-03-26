@@ -87,7 +87,7 @@ pub fn generate_commit_info(
 
     let body = json!({
         "model": model,
-        "provider": {"order": ["groq"]},
+        "provider": {"only": ["groq"]},
         "messages": [
             {
                 "role": "system",
