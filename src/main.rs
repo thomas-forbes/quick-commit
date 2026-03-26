@@ -5,9 +5,11 @@ mod ui;
 
 use colored::*;
 use git2::Repository;
+use std::env;
 use std::thread;
 
 fn main() {
+    let verbose = parse_args();
     let repo = Repository::discover(".").unwrap_or_else(|_| {
         eprintln!("{}", "Error opening git repo •◠•".red());
         std::process::exit(1);
@@ -66,21 +68,36 @@ fn main() {
         .unwrap_or_else(|_| Err("AI thread panicked".to_string()));
     spinner.stop();
 
-    let (commit_message, branch_name) = result.unwrap_or_else(|e| {
+    let generated = result.unwrap_or_else(|e| {
         eprintln!("{}", format!("AI generation failed: {}", e).red());
         eprintln!("{}", "Falling back to manual input.".yellow());
-        (String::new(), Some(String::new()))
+        ai::GeneratedCommitInfo {
+            commit_message: String::new(),
+            branch_name: Some(String::new()),
+            stats: ai::QueryStats {
+                total_time_ms: None,
+                input_tokens: None,
+                output_tokens: None,
+            },
+        }
     });
 
+    if verbose {
+        ui::print_ai_query_stats(&generated.stats);
+    }
+
     // Present AI-generated text as editable — just press Enter to accept, or edit inline
-    let final_message = ui::editable_prompt("Commit: ", &commit_message.trim())
+    let final_message = ui::editable_prompt("Commit: ", &generated.commit_message.trim())
         .trim()
         .to_string();
     let final_branch = if create_new_branch {
         Some(
-            ui::editable_prompt("Branch: ", &branch_name.unwrap_or_default().trim())
-                .trim()
-                .to_string(),
+            ui::editable_prompt(
+                "Branch: ",
+                &generated.branch_name.unwrap_or_default().trim(),
+            )
+            .trim()
+            .to_string(),
         )
     } else {
         None
@@ -96,4 +113,26 @@ fn main() {
     if !push_input.eq_ignore_ascii_case("n") {
         git::push(&repo, final_branch.is_some());
     }
+}
+
+fn parse_args() -> bool {
+    let mut verbose = false;
+
+    for arg in env::args().skip(1) {
+        match arg.as_str() {
+            "-v" | "--verbose" => verbose = true,
+            "-h" | "--help" => {
+                println!("Usage: qc [-v|--verbose]");
+                println!("  -v, --verbose    Show AI total time and tokens");
+                std::process::exit(0);
+            }
+            _ => {
+                eprintln!("{}", format!("Unknown argument: {}", arg).red());
+                eprintln!("Usage: qc [-v|--verbose]");
+                std::process::exit(2);
+            }
+        }
+    }
+
+    verbose
 }

@@ -79,6 +79,34 @@ pub fn print_changes(files: &[(String, Status)], insertions: usize, deletions: u
     );
 }
 
+pub fn print_ai_query_stats(stats: &crate::ai::QueryStats) {
+    let total = stats
+        .total_time_ms
+        .map(|ms| format!("{}ms", ms))
+        .unwrap_or_else(|| "unavailable".to_string());
+    let input_tokens = stats
+        .input_tokens
+        .map(|count| count.to_string())
+        .unwrap_or_else(|| "unavailable".to_string());
+    let output_tokens = stats
+        .output_tokens
+        .map(|count| count.to_string())
+        .unwrap_or_else(|| "unavailable".to_string());
+
+    println!(
+        "{}",
+        format!(
+            "{}={} {}={} {}={}",
+            "time".purple(),
+            total.yellow(),
+            "input_tokens".purple(),
+            input_tokens.yellow(),
+            "output_tokens".purple(),
+            output_tokens.yellow(),
+        )
+    );
+}
+
 // -- Spinner ---------------------------------------------------------------
 
 pub struct Spinner {

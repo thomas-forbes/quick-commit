@@ -14,6 +14,12 @@ cargo install quick-commit
 qc
 ```
 
+Use `-v` or `--verbose` to print AI query metrics after the response comes back:
+
+```bash
+qc -v
+```
+
 ## Configuration
 
 Quick Commit stores settings in `~/.config/quick-commit/config.toml`.

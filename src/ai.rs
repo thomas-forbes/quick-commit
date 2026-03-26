@@ -1,6 +1,19 @@
 use serde_json::{json, Value};
+use std::time::Instant;
 
 use crate::config::SemanticType;
+
+pub struct QueryStats {
+    pub total_time_ms: Option<u128>,
+    pub input_tokens: Option<u64>,
+    pub output_tokens: Option<u64>,
+}
+
+pub struct GeneratedCommitInfo {
+    pub commit_message: String,
+    pub branch_name: Option<String>,
+    pub stats: QueryStats,
+}
 
 fn strip_code_fences(s: &str) -> &str {
     let s = s.trim();
@@ -25,7 +38,8 @@ pub fn generate_commit_info(
     api_key: &str,
     model: &str,
     semantic_types: &[SemanticType],
-) -> Result<(String, Option<String>), String> {
+) -> Result<GeneratedCommitInfo, String> {
+    let total_start = Instant::now();
     let branch_step = if new_branch {
         "\nStep 3 — Write the branch name as: <type>/<short-kebab-case-slug>\n\
               • Must use the SAME type prefix as the commit message\n\
@@ -71,7 +85,7 @@ pub fn generate_commit_info(
         {types_list}\n\n\
         Step 2 — Write the commit message as: <type>: <concise imperative description>\n\
           • Use the imperative mood (\"add\", not \"added\" or \"adds\")\n\
-          • Keep it under 72 characters\n\
+          • Keep it generally under 72 characters\n\
           • Do NOT capitalize the description\n\
           • No trailing period\n\
         {branch_step}\n\
@@ -87,7 +101,8 @@ pub fn generate_commit_info(
 
     let body = json!({
         "model": model,
-        "provider": {"only": ["groq"]},
+        "reasoning": { "effort": "minimal" },
+        "provider": {"order": ["groq"]},
         "messages": [
             {
                 "role": "system",
@@ -101,6 +116,7 @@ pub fn generate_commit_info(
         "temperature": 0.3
     });
 
+    let request_start = Instant::now();
     let resp = ureq::post("https://openrouter.ai/api/v1/chat/completions")
         .set("Authorization", &format!("Bearer {}", api_key))
         .set("Content-Type", "application/json")
@@ -112,10 +128,21 @@ pub fn generate_commit_info(
             }
             other => format!("Request failed: {}", other),
         })?;
+    let local_total_time_ms = total_start.elapsed().as_millis();
 
     let json_resp: Value = resp
         .into_json()
         .map_err(|e| format!("Failed to parse API response: {}", e))?;
+
+    let generation_id = json_resp["id"].as_str();
+
+    let input_tokens = json_resp["usage"]["prompt_tokens"].as_u64();
+    let output_tokens = json_resp["usage"]["completion_tokens"].as_u64();
+    let total_time_ms = generation_id
+        .and_then(|id| fetch_generation_timing(id, api_key).ok())
+        .unwrap_or(Some(
+            local_total_time_ms.max(request_start.elapsed().as_millis()),
+        ));
 
     let content = json_resp["choices"][0]["message"]["content"]
         .as_str()
@@ -142,5 +169,44 @@ pub fn generate_commit_info(
         None
     };
 
-    Ok((commit_message, branch_name))
+    Ok(GeneratedCommitInfo {
+        commit_message,
+        branch_name,
+        stats: QueryStats {
+            total_time_ms,
+            input_tokens,
+            output_tokens,
+        },
+    })
+}
+
+fn fetch_generation_timing(id: &str, api_key: &str) -> Result<Option<u128>, String> {
+    let resp = ureq::get("https://openrouter.ai/api/v1/generation")
+        .set("Authorization", &format!("Bearer {}", api_key))
+        .query("id", id)
+        .call()
+        .map_err(|e| match e {
+            ureq::Error::Status(code, response) => {
+                let body = response.into_string().unwrap_or_default();
+                format!("Generation API error ({}): {}", code, body)
+            }
+            other => format!("Generation request failed: {}", other),
+        })?;
+
+    let json_resp: Value = resp
+        .into_json()
+        .map_err(|e| format!("Failed to parse generation response: {}", e))?;
+
+    let latency_ms = json_resp["data"]["latency"]
+        .as_f64()
+        .map(|ms| ms.round() as u128);
+    let generation_time_ms = json_resp["data"]["generation_time"]
+        .as_f64()
+        .map(|ms| ms.round() as u128);
+    Ok(match (latency_ms, generation_time_ms) {
+        (Some(latency), Some(generation)) => Some(latency + generation),
+        (Some(latency), None) => Some(latency),
+        (None, Some(generation)) => Some(generation),
+        (None, None) => None,
+    })
 }
