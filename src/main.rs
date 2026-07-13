@@ -78,6 +78,8 @@ fn main() {
                 total_time_ms: None,
                 input_tokens: None,
                 output_tokens: None,
+                provider: None,
+                attempts: None,
             },
         }
     });

@@ -92,17 +92,26 @@ pub fn print_ai_query_stats(stats: &crate::ai::QueryStats) {
         .output_tokens
         .map(|count| count.to_string())
         .unwrap_or_else(|| "unavailable".to_string());
+    let provider = stats.provider.as_deref().unwrap_or("unavailable");
+    let attempts = stats
+        .attempts
+        .map(|count| count.to_string())
+        .unwrap_or_else(|| "unavailable".to_string());
 
     println!(
         "{}",
         format!(
-            "{}={} {}={} {}={}",
+            "{}={} {}={} {}={} {}={} {}={}",
             "time".purple(),
             total.yellow(),
             "input_tokens".purple(),
             input_tokens.yellow(),
             "output_tokens".purple(),
             output_tokens.yellow(),
+            "provider".purple(),
+            provider.yellow(),
+            "attempts".purple(),
+            attempts.yellow(),
         )
     );
 }

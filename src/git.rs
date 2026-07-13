@@ -83,8 +83,9 @@ pub fn get_remote_url(repo: &Repository, remote_name: &str) -> Result<String, Er
     Ok(remote.url().unwrap_or_default().to_string())
 }
 
-/// Build the full context string sent to the LLM: a file summary header
-/// with per-file stats, followed by the complete diff.
+const MAX_DIFF_CHARS: usize = 24_000;
+
+/// Build the context sent to the LLM: a file summary plus a bounded staged diff.
 pub fn build_diff_context(
     files: &[(String, Status)],
     insertions: usize,
@@ -92,20 +93,6 @@ pub fn build_diff_context(
 ) -> String {
     let mut ctx = String::new();
 
-    // -- Repo context (branch + recent commits) --
-    let branch = git_command_output(&["rev-parse", "--abbrev-ref", "HEAD"])
-        .unwrap_or_else(|| "unknown".to_string());
-    let log = git_command_output(&["log", "-n", "5", "--stat", "--oneline"])
-        .unwrap_or_else(|| "unavailable".to_string());
-    ctx.push_str("== Repo Context ==\n");
-    ctx.push_str(&format!("Branch: {}\n", branch));
-    ctx.push_str("Recent commits:\n");
-    for line in log.lines() {
-        ctx.push_str(&format!("{}\n", line));
-    }
-    ctx.push('\n');
-
-    // -- File summary header with per-file stats --
     let numstat = collect_numstat();
     ctx.push_str("== Changed Files ==\n");
     for (path, status) in files {
@@ -130,23 +117,27 @@ pub fn build_diff_context(
         deletions,
     ));
 
-    // -- Full diff body (everything is staged) --
-    ctx.push_str("\n== Diff ==\n");
-
     let staged = Command::new("git")
         .args(["diff", "--cached"])
         .output()
         .expect("failed to get staged diff");
+    let diff = String::from_utf8_lossy(&staged.stdout);
 
-    ctx.push_str(&String::from_utf8_lossy(&staged.stdout));
-
-    const MAX_CONTEXT_LEN: usize = 100_000;
-    if ctx.len() > MAX_CONTEXT_LEN {
-        ctx.truncate(MAX_CONTEXT_LEN);
-        ctx.push_str("\n... (diff truncated)");
+    ctx.push_str("\n== Staged Diff ==\n");
+    ctx.push_str(truncate_chars(&diff, MAX_DIFF_CHARS));
+    if diff.chars().count() > MAX_DIFF_CHARS {
+        ctx.push_str("\n... (remaining diff omitted)");
     }
 
     ctx
+}
+
+fn truncate_chars(input: &str, max_chars: usize) -> &str {
+    input
+        .char_indices()
+        .nth(max_chars)
+        .map(|(byte_index, _)| &input[..byte_index])
+        .unwrap_or(input)
 }
 
 /// Parse `git diff --numstat` (staged + unstaged) into a map of path -> (additions, deletions).
@@ -174,19 +165,6 @@ fn collect_numstat() -> std::collections::HashMap<String, (usize, usize)> {
     map
 }
 
-fn git_command_output(args: &[&str]) -> Option<String> {
-    let out = Command::new("git").args(args).output().ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if text.is_empty() {
-        None
-    } else {
-        Some(text)
-    }
-}
-
 pub fn create_branch(repo: &Repository, branch: &str) {
     if branch_exists(repo, branch) {
         eprintln!(
@@ -202,6 +180,16 @@ pub fn create_branch(repo: &Repository, branch: &str) {
     if !out.status.success() {
         eprintln!("{}", String::from_utf8_lossy(&out.stderr).red());
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::truncate_chars;
+
+    #[test]
+    fn truncates_at_a_character_boundary() {
+        assert_eq!(truncate_chars("aé中", 2), "aé");
     }
 }
 
